@@ -1,0 +1,14 @@
+/* Force full width layout globally */
+#root, body, html {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background: linear-gradient(135deg, #c9b6ff, #b3e5fc) !important;
+  background-size: cover !important;
+  background-attachment: fixed !important;
+}
