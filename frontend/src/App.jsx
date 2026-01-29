@@ -1,292 +1,282 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import "./App.css"; // ✅ make sure this line is here
+import "./App.css";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Trash2, Plus, LogOut, Search,
+  LayoutDashboard, PieChart, Settings, Briefcase, Heart, Calendar 
+} from "lucide-react";
+import { 
+  BarChart, Bar, XAxis, YAxis, Tooltip, 
+  ResponsiveContainer 
+} from "recharts";
 
 function App() {
+  // --- STATE ---
+  const [token, setToken] = useState(localStorage.getItem("token"));
+  const [isLogin, setIsLogin] = useState(true);
+  const [view, setView] = useState("dashboard");
   const [tasks, setTasks] = useState([]);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [category, setCategory] = useState("Personal");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  // --- LOGIC ---
+  const fetchTasks = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/tasks", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTasks(res.data);
+    } catch (err) {
+      if (err.response?.status === 401) logout();
+    }
+  };
 
   useEffect(() => {
-    fetchTasks();
-  }, []);
+    if (token) fetchTasks();
+  }, [token]);
 
-  const fetchTasks = async () => {
-    const res = await axios.get("http://localhost:5000/tasks");
-    setTasks(res.data);
+  const handleAuth = async () => {
+    try {
+      const url = isLogin ? "http://localhost:5000/auth/login" : "http://localhost:5000/auth/register";
+      const payload = isLogin ? { email, password } : { name, email, password };
+      const res = await axios.post(url, payload);
+      if (isLogin) {
+        localStorage.setItem("token", res.data.token);
+        setToken(res.data.token);
+      } else {
+        alert("Success! Please login.");
+        setIsLogin(true);
+      }
+    } catch (err) { alert(err.response?.data?.message || "Auth error"); }
   };
 
   const addTask = async () => {
     if (!title.trim()) return;
-    const res = await axios.post("http://localhost:5000/tasks", { title });
-    setTasks([...tasks, res.data]);
-    setTitle("");
+    const taskData = { title, dueDate: dueDate || null, category, progress: 0, completed: false };
+    try {
+      const res = await axios.post("http://localhost:5000/tasks", taskData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTasks([...tasks, res.data]);
+      setTitle(""); setDueDate("");
+    } catch (err) { alert("Error saving to MongoDB"); }
+  };
+
+  const updateProgress = async (id, newProgress) => {
+    const progressNum = Number(newProgress);
+
+    // 1. Optimistic Update: Change the slider instantly in UI
+    setTasks(prevTasks => 
+      prevTasks.map(t => t._id === id ? { ...t, progress: progressNum } : t)
+    );
+
+    try {
+      const res = await axios.put(`http://localhost:5000/tasks/${id}`, 
+        { progress: progressNum, completed: progressNum === 100 }, 
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // 2. Sync with server response
+      setTasks(prev => prev.map(t => t._id === id ? res.data : t));
+    } catch (err) {
+      console.error("Momentum sync failed:", err);
+      fetchTasks(); // Rollback on failure
+    }
   };
 
   const deleteTask = async (id) => {
-    await axios.delete(`http://localhost:5000/tasks/${id}`);
-    setTasks(tasks.filter((t) => t._id !== id));
+    try {
+      await axios.delete(`http://localhost:5000/tasks/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setTasks(tasks.filter((t) => t._id !== id));
+    } catch (err) { console.error(err); }
   };
 
-  const toggleTask = async (id) => {
-    const task = tasks.find((t) => t._id === id);
-    const res = await axios.put(`http://localhost:5000/tasks/${id}`, {
-      completed: !task.completed,
-    });
-    setTasks(tasks.map((t) => (t._id === id ? res.data : t)));
+  const logout = () => {
+    localStorage.removeItem("token");
+    setToken(null);
+    setTasks([]);
   };
 
-  const completedCount = tasks.filter((t) => t.completed).length;
-  const progress =
-    tasks.length === 0 ? 0 : Math.round((completedCount / tasks.length) * 100);
+  const filteredTasks = tasks.filter(t => 
+    t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const quotes = [
-    "Believe in yourself 🌟",
-    "Keep going 💪",
-    "Dream. Plan. Do. 🚀",
-    "Progress, not perfection ✨",
-    "You’ve got this 🔥",
-  ];
-
+   if (!token) {
   return (
-    <div
-      style={{
-        fontFamily: "'Poppins', sans-serif",
-        background: "linear-gradient(120deg, #d1c4e9, #b2ebf2)",
-        minHeight: "100vh",
-        width: "100%",
-        overflow: "hidden",
-        position: "relative",
-      }}
-    >
-      {/* 🧚 Floating cute animated characters */}
-      <div className="character char-left" aria-hidden="true">
-        <div className="face">
-          <div className="eye eye-left" />
-          <div className="eye eye-right" />
-          <div className="mouth" />
-        </div>
-        <div className="bubble">You got this!</div>
-      </div>
-
-      <div className="character char-right" aria-hidden="true">
-        <div className="face face-2">
-          <div className="eye eye-left" />
-          <div className="eye eye-right" />
-          <div className="mouth smile" />
-        </div>
-        <div className="bubble">One step at a time ✨</div>
-      </div>
-
-      {/* floating motivational quotes */}
-      {quotes.map((q, i) => (
-        <div
-          key={i}
-          style={{
-            position: "absolute",
-            top: `${10 + i * 15}%`,
-            left: i % 2 === 0 ? `${5 + i * 12}%` : `${60 + i * 8}%`,
-            background: "rgba(255,255,255,0.5)",
-            color: "#4a148c",
-            padding: "10px 16px",
-            borderRadius: "20px",
-            fontSize: "14px",
-            animation: `float${i} 12s ease-in-out infinite`,
-            whiteSpace: "nowrap",
-            zIndex: 0,
-          }}
-        >
-          {q}
-        </div>
-      ))}
-
-      <style>
-        {`
-          @keyframes float0 {0%,100%{transform:translateY(0);}50%{transform:translateY(-25px);} }
-          @keyframes float1 {0%,100%{transform:translateY(0);}50%{transform:translateY(30px);} }
-          @keyframes float2 {0%,100%{transform:translateY(0);}50%{transform:translateY(-35px);} }
-          @keyframes float3 {0%,100%{transform:translateY(0);}50%{transform:translateY(25px);} }
-          @keyframes float4 {0%,100%{transform:translateY(0);}50%{transform:translateY(-20px);} }
-        `}
-      </style>
-
-      {/* full-width main section */}
-      <div
-        style={{
-          width: "100%",
-          padding: "50px 5%",
-          boxSizing: "border-box",
-          display: "flex",
-          flexDirection: "column",
-          gap: 25,
-          zIndex: 1,
-          position: "relative",
-        }}
+    <div className="auth-viewport">
+      <div className="auth-background-glow" /> {/* Decorative glow */}
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }} 
+        animate={{ opacity: 1, scale: 1 }} 
+        className="auth-card"
       >
-        <h1
-          style={{
-            textAlign: "center",
-            color: "#4a148c",
-            fontSize: "2.5rem",
-            marginBottom: 10,
-          }}
-        >
-          ✨ Task Manager
-        </h1>
-
-        {/* input and add button */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: 15,
-            width: "100%",
-          }}
-        >
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Type a new task..."
-            style={{
-              flex: 1,
-              padding: "12px 18px",
-              border: "2px solid #d1c4e9",
-              borderRadius: 10,
-              fontSize: 16,
-              outline: "none",
-              maxWidth: "70%",
-            }}
-          />
-          <button
-            onClick={addTask}
-            style={{
-              background: "linear-gradient(135deg,#7e57c2,#ab47bc)",
-              color: "white",
-              border: "none",
-              padding: "12px 18px",
-              borderRadius: 10,
-              cursor: "pointer",
-              fontSize: 16,
-              transition: "transform 0.3s",
-            }}
-            onMouseEnter={(e) => (e.target.style.transform = "scale(1.1)")}
-            onMouseLeave={(e) => (e.target.style.transform = "scale(1)")}
-          >
-            Add
+        <div className="sidebar-brand auth-logo">FOCUS<span>FLOW</span></div>
+        <h1>{isLogin ? "Welcome Back" : "Create Account"}</h1>
+        <p className="auth-subtitle">Elevate your daily momentum</p>
+        
+        <div className="auth-form">
+          {!isLogin && (
+             <div className="auth-input-wrapper password-field">
+  <input 
+    type={showPassword ? "text" : "password"} // Switches between text and dots
+    placeholder="Password" 
+    value={password} 
+    onChange={(e) => setPassword(e.target.value)} 
+  />
+  <button 
+    type="button"
+    className="password-toggle-icon"
+    onClick={() => setShowPassword(!showPassword)} // Toggles the state
+  >
+    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+  </button>
+</div>
+          )}
+          <div className="auth-input-wrapper">
+            <input 
+              placeholder="Email Address" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+            />
+          </div>
+          <div className="auth-input-wrapper">
+            <input 
+              type="password" 
+              placeholder="Password" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+            />
+          </div>
+          
+          <button className="auth-main-btn" onClick={handleAuth}>
+            {isLogin ? "Sign In" : "Get Started"}
           </button>
         </div>
 
-        {/* progress bar */}
-        {tasks.length > 0 && (
-          <div style={{ width: "80%", margin: "0 auto" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: 14,
-                color: "#555",
-                marginBottom: 5,
-              }}
-            >
-              <span>
-                Completed: {completedCount}/{tasks.length}
-              </span>
-              <span>{progress}%</span>
-            </div>
-            <div
-              style={{
-                background: "#e0e0e0",
-                height: 10,
-                borderRadius: 10,
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  height: "100%",
-                  width: `${progress}%`,
-                  background: "linear-gradient(135deg,#7e57c2,#ab47bc)",
-                  transition: "width 0.4s ease",
-                }}
-              ></div>
-            </div>
-          </div>
-        )}
+        <p className="toggle-auth" onClick={() => setIsLogin(!isLogin)}>
+          {isLogin ? "Don't have an account? " : "Already a member? "}
+          <span>{isLogin ? "Sign Up" : "Login"}</span>
+        </p>
+      </motion.div>
+    </div>
+  );
+}
 
-        {/* task list full width */}
-        <ul
-          style={{
-            listStyle: "none",
-            margin: "30px auto",
-            padding: 0,
-            width: "80%",
-            maxHeight: "50vh",
-            overflowY: "auto",
-          }}
-        >
-          {tasks.length === 0 ? (
-            <p style={{ textAlign: "center", color: "#555" }}>
-              No tasks yet. Add one above! 🌸
-            </p>
-          ) : (
-            tasks.map((task) => (
-              <li
-                key={task._id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "16px 20px",
-                  marginBottom: 12,
-                  background: task.completed ? "#e8f5e9" : "#f3e5f5",
-                  borderRadius: 12,
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-                  transition: "transform 0.2s",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.transform = "scale(1.02)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.transform = "scale(1)")
-                }
-              >
-                <span
-                  onClick={() => toggleTask(task._id)}
-                  style={{
-                    cursor: "pointer",
-                    textDecoration: task.completed ? "line-through" : "none",
-                    color: task.completed ? "#2e7d32" : "#4a148c",
-                    fontWeight: 500,
-                    flex: 1,
-                  }}
-                >
-                  {task.title}
-                </span>
-                <button
-                  onClick={() => deleteTask(task._id)}
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    color: "#d32f2f",
-                    fontSize: 20,
-                    cursor: "pointer",
-                    transition: "transform 0.2s",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.target.style.transform = "scale(1.3)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.target.style.transform = "scale(1)")
-                  }
-                >
-                  ✕
-                </button>
-              </li>
-            ))
+  return (
+    <div className="app-layout">
+      <aside className="sidebar">
+        <div className="sidebar-brand">FOCUS<span>FLOW</span></div>
+        <nav className="nav-list">
+          <div className={`nav-item ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}><LayoutDashboard size={18}/> Dashboard</div>
+          <div className={`nav-item ${view === 'analytics' ? 'active' : ''}`} onClick={() => setView('analytics')}><PieChart size={18}/> Analytics</div>
+          <div className={`nav-item ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}><Settings size={18}/> Settings</div>
+        </nav>
+        <div className="sidebar-footer">
+          <button onClick={logout} className="logout-btn"><LogOut size={16}/> Logout</button>
+        </div>
+      </aside>
+
+      <main className="main-body">
+        <header className="top-nav">
+          <div className="search-wrapper">
+            <Search size={16} color="var(--text-dim)" />
+            <input className="main-search-input" placeholder="Search goals..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            <span className="search-hint">Ctrl + K</span>
+          </div>
+          <div className="user-info">Himangi ✨</div>
+        </header>
+
+        <div className="content-container">
+          {view === "dashboard" && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <div className="dashboard-hero">
+                <div className="hero-text">
+                  <h1>Focus, Himangi</h1>
+                  <p>You have {tasks.filter(t => !t.completed).length} missions remaining today.</p>
+                </div>
+                <div className="quick-stats">
+                  <div className="mini-stat">
+                    <div className="stat-icon career"><Briefcase size={16} /></div>
+                    <div className="stat-data"><span>Career</span><p>{tasks.filter(t => t.category === "Career").length}</p></div>
+                  </div>
+                  <div className="mini-stat">
+                    <div className="stat-icon personal"><Heart size={16} /></div>
+                    <div className="stat-data"><span>Personal</span><p>{tasks.filter(t => t.category === "Personal").length}</p></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="input-paddock">
+                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Define your next mission..." className="main-input" />
+                <div className="input-group-right">
+                  <select className="scheme-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+                    <option value="Personal">Personal</option>
+                    <option value="Career">Career</option>
+                  </select>
+                  <input type="date" className="scheme-date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                  <button onClick={addTask} className="add-btn-primary"><Plus size={18} /> Add</button>
+                </div>
+              </div>
+
+              <div className="task-scroll">
+                <AnimatePresence mode="popLayout">
+                  {filteredTasks.map(task => (
+                    <motion.div key={task._id} layout className={`task-card-premium ${task.completed ? 'is-done' : ''}`}>
+                      <div className="card-top">
+                        <span className="category-pill">{task.category}</span>
+                        <p className="task-title-text">{task.title}</p>
+                      </div>
+                      <div className="card-middle">
+                        <div className="momentum-header"><label>Momentum</label><span>{task.progress ?? 0}%</span></div>
+                        <input type="range" min="0" max="100" step="1" value={task.progress ?? 0} onChange={(e) => updateProgress(task._id, e.target.value)} className="momentum-slider" />
+                      </div>
+                      <div className="card-bottom">
+                        <span className="deadline-text"><Calendar size={12} /> {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'Unscheduled'}</span>
+                        <button className="delete-icon-btn" onClick={() => deleteTask(task._id)}><Trash2 size={16}/></button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </motion.div>
           )}
-        </ul>
-      </div>
+
+          {view === "analytics" && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="analytics-view">
+              <div className="analytics-header"><h2>Performance Overview</h2><p>Tracking momentum across {tasks.length} goals.</p></div>
+              <div className="analytics-grid">
+                <div className="glass-card"><span>Avg Momentum</span><h3>{tasks.length > 0 ? Math.round(tasks.reduce((acc, curr) => acc + curr.progress, 0) / tasks.length) : 0}%</h3></div>
+                <div className="glass-card"><span>Completed Tasks</span><h3>{tasks.filter(t => t.completed).length}</h3></div>
+              </div>
+              <div className="chart-wrapper-glass">
+                <div style={{ height: '300px', width: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={tasks}>
+                      <defs>
+                        <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--accent)" stopOpacity={1}/>
+                          <stop offset="100%" stopColor="var(--accent)" stopOpacity={0.3}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="title" stroke="var(--text-dim)" fontSize={10} tickLine={false} axisLine={false} />
+                      <YAxis stroke="var(--text-dim)" fontSize={10} tickLine={false} axisLine={false} />
+                      <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{backgroundColor: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '12px'}} />
+                      <Bar dataKey="progress" fill="url(#barGradient)" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }

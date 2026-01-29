@@ -1,14 +1,15 @@
-/* Force full width layout globally */
+/* index.css - Deep Dark Foundation */
+* {
+  box-sizing: border-box;
+}
+
 #root, body, html {
   width: 100% !important;
-  max-width: 100% !important;
+  height: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
-  overflow-x: hidden !important;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  background: linear-gradient(135deg, #c9b6ff, #b3e5fc) !important;
-  background-size: cover !important;
-  background-attachment: fixed !important;
+  /* We remove the light purple gradient here */
+  background: #020408 !important; 
+  color: white;
+  overflow: hidden;
 }
