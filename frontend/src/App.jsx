@@ -107,6 +107,18 @@ function App() {
     t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  
+  const getUrgencyClass = (dueDate) => {
+  if (!dueDate) return "";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const date = new Date(dueDate);
+  date.setHours(0, 0, 0, 0);
+
+  if (date < today) return "overdue"; // Date has passed
+  if (date.getTime() === today.getTime()) return "due-today"; // Due today
+  return "";
+};
 
    if (!token) {
   return (
@@ -117,6 +129,11 @@ function App() {
         animate={{ opacity: 1, scale: 1 }} 
         className="auth-card"
       >
+        <motion.div 
+          key={task._id} 
+          layout 
+          className={`task-card-premium ${task.completed ? 'is-done' : ''} ${getUrgencyClass(task.dueDate)}`}
+      ></motion.div>
         <div className="sidebar-brand auth-logo">FOCUS<span>FLOW</span></div>
         <h1>{isLogin ? "Welcome Back" : "Create Account"}</h1>
         <p className="auth-subtitle">Elevate your daily momentum</p>
@@ -164,6 +181,12 @@ function App() {
           {isLogin ? "Don't have an account? " : "Already a member? "}
           <span>{isLogin ? "Sign Up" : "Login"}</span>
         </p>
+        <span className="deadline-text">
+       <Calendar size={12} /> 
+        {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'Unscheduled'}
+        {/* This adds a red/orange dot if it's urgent */}
+        {getUrgencyClass(task.dueDate) && <span className="urgency-dot">●</span>}
+         </span>
       </motion.div>
     </div>
   );

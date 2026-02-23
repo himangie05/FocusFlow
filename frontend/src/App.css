@@ -284,3 +284,30 @@ body, html, #root {
 }
 
 .toggle-auth span { color: var(--accent); font-weight: 700; }
+/* --- Deadline Urgency Styles --- */
+
+/* Overdue: Red Accent */
+.task-card-premium.overdue {
+  border-color: rgba(255, 82, 82, 0.4) !important;
+}
+.task-card-premium.overdue::before {
+  background: #ff5252;
+  box-shadow: 0 0 15px rgba(255, 82, 82, 0.5);
+}
+.task-card-premium.overdue .deadline-text {
+  color: #ff5252;
+  font-weight: 700;
+}
+
+/* Due Today: Orange Accent */
+.task-card-premium.due-today {
+  border-color: rgba(255, 152, 0, 0.4) !important;
+}
+.task-card-premium.due-today::before {
+  background: #ff9800;
+  box-shadow: 0 0 15px rgba(255, 152, 0, 0.5);
+}
+.task-card-premium.due-today .deadline-text {
+  color: #ff9800;
+  font-weight: 700;
+}
